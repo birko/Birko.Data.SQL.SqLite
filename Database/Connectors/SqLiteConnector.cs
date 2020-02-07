@@ -5,15 +5,15 @@ using System.Data.Common;
 using System.Data.SQLite;
 using System.Linq;
 using System.Text;
-using Birko.Data.SQL.Condition;
-using Birko.Data.SQL.Connector;
-using Birko.Data.SQL.Field;
+using Birko.Data.SQL.Conditions;
+using Birko.Data.SQL.Connectors;
+using Birko.Data.SQL.Fields;
 
-namespace Birko.Data.SQL.Connector
+namespace Birko.Data.SQL.Connectors
 {
     public class SqLiteConnector : AbstractConnector
     {
-        public SqLiteConnector(Store.PasswordSettings settings) : base(settings)
+        public SqLiteConnector(Data.Stores.PasswordSettings settings) : base(settings)
         {
             OnException += SqLiteConnector_OnException;
         }
@@ -40,7 +40,7 @@ namespace Birko.Data.SQL.Connector
             }
         }
 
-        public override DbConnection CreateConnection(Store.PasswordSettings settings)
+        public override DbConnection CreateConnection(Stores.PasswordSettings settings)
         {
             if (settings != null && !string.IsNullOrEmpty(Path))
             {

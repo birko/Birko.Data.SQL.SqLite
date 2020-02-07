@@ -9,10 +9,10 @@
     <Import_RootNamespace>Birko.Data.DataBase.Connector.SqLite</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)Database\Connector\SqLiteConnector.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Repository\SqLiteRepository.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Database\Connectors\SqLiteConnector.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Repositories\SqLiteRepository.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Database\Connector\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Database\Connectors\" />
   </ItemGroup>
 </Project>
