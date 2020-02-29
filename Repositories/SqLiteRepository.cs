@@ -9,7 +9,7 @@ namespace Birko.Data.SQL.Repositories
         where TModel : Models.AbstractModel, Models.ILoadable<TViewModel>
         where TViewModel : Models.ILoadable<TModel>
     {
-        public SqLiteRepository(string path, string filename, InitConnector onInit = null) : base(path, filename, onInit)
+        public SqLiteRepository(Stores.PasswordSettings settings, InitConnector onInit = null) : base(settings, onInit)
         { }
     }
 }
