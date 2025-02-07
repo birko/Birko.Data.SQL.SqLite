@@ -99,8 +99,8 @@ namespace Birko.Data.SQL.Connectors
                 case DbType.Xml:
                 case DbType.Object:
                 case DbType.Binary:
-                case DbType.Guid:
                     return "BLOB";
+                case DbType.Guid:
                 case DbType.String:
                 case DbType.StringFixedLength:
                 case DbType.AnsiString:
@@ -140,6 +140,10 @@ namespace Birko.Data.SQL.Connectors
 
         public override DbCommand AddParameter(DbCommand command, string name, object value)
         {
+            if(value is Guid)
+            {
+                value = (object?)value?.ToString();
+            }
             if (command.Parameters.Contains(name))
             {
                 (command.Parameters[name] as SQLiteParameter).Value = value ?? DBNull.Value;
