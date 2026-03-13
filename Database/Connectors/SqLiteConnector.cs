@@ -21,7 +21,7 @@ namespace Birko.Data.SQL.Connectors
             OnException += SqLiteConnector_OnException;
         }
 
-        private void SqLiteConnector_OnException(Exception ex, string commandText)
+        private void SqLiteConnector_OnException(Exception ex, string? commandText)
         {
             if (ex is SQLiteException && !IsInitializing && ex.Message.Contains("SQL logic error") && ex.Message.Contains("no such table:"))
             {
@@ -33,7 +33,7 @@ namespace Birko.Data.SQL.Connectors
             }
         }
 
-        public string Path
+        public string? Path
         {
             get
             {
@@ -141,24 +141,24 @@ namespace Birko.Data.SQL.Connectors
             return result.ToString();
         }
 
-        public override DbCommand AddParameter(DbCommand command, string name, object value)
+        public override DbCommand AddParameter(DbCommand command, string name, object? value)
         {
             if(value is Guid)
             {
-                value = (object?)value?.ToString();
+                value = value?.ToString();
             }
             if (command.Parameters.Contains(name))
             {
-                (command.Parameters[name] as SQLiteParameter).Value = value ?? DBNull.Value;
+                ((SQLiteParameter)command.Parameters[name]).Value = value ?? DBNull.Value;
             }
             else
             {
-                (command as SQLiteCommand).Parameters.AddWithValue(name, value ?? DBNull.Value);
+                ((SQLiteCommand)command).Parameters.AddWithValue(name, value ?? DBNull.Value);
             }
             return command;
         }
 
-        private object ConvertFieldValue(AbstractField field, object model)
+        private object? ConvertFieldValue(AbstractField field, object model)
         {
             var value = field.Write(model);
             if (value is Guid guid)
@@ -166,7 +166,7 @@ namespace Birko.Data.SQL.Connectors
             return value;
         }
 
-        private object ConvertPrimaryKeyValue(AbstractField field, object model)
+        private object? ConvertPrimaryKeyValue(AbstractField field, object model)
         {
             var value = field.Property.GetValue(model);
             if (value is Guid guid)
@@ -192,7 +192,7 @@ namespace Birko.Data.SQL.Connectors
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
@@ -243,7 +243,7 @@ namespace Birko.Data.SQL.Connectors
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
@@ -293,7 +293,7 @@ namespace Birko.Data.SQL.Connectors
             if (table == null)
                 return;
 
-            var primaryFields = table.GetPrimaryFields().ToList();
+            var primaryFields = (table.GetPrimaryFields() ?? Enumerable.Empty<AbstractField>()).ToList();
             if (!primaryFields.Any())
                 return;
 
@@ -305,7 +305,7 @@ namespace Birko.Data.SQL.Connectors
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
@@ -358,7 +358,7 @@ namespace Birko.Data.SQL.Connectors
             if (table == null)
                 return;
 
-            var primaryFields = table.GetPrimaryFields().ToList();
+            var primaryFields = (table.GetPrimaryFields() ?? Enumerable.Empty<AbstractField>()).ToList();
             if (!primaryFields.Any())
                 return;
 
@@ -370,7 +370,7 @@ namespace Birko.Data.SQL.Connectors
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
@@ -429,14 +429,14 @@ namespace Birko.Data.SQL.Connectors
             if (table == null)
                 return;
 
-            var primaryFields = table.GetPrimaryFields().ToList();
+            var primaryFields = (table.GetPrimaryFields() ?? Enumerable.Empty<AbstractField>()).ToList();
             if (!primaryFields.Any())
                 return;
 
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
@@ -479,14 +479,14 @@ namespace Birko.Data.SQL.Connectors
             if (table == null)
                 return;
 
-            var primaryFields = table.GetPrimaryFields().ToList();
+            var primaryFields = (table.GetPrimaryFields() ?? Enumerable.Empty<AbstractField>()).ToList();
             if (!primaryFields.Any())
                 return;
 
             using var connection = (SQLiteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
-            string commandText = null;
+            string? commandText = null;
             try
             {
                 using var command = connection.CreateCommand();
