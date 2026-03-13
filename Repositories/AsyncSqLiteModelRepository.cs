@@ -1,5 +1,7 @@
 using Birko.Data.SQL.Connectors;
 using Birko.Data.Stores;
+using Birko.Data.SQL.SqLite.Stores;
+using Birko.Data.SQL.Stores;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +20,7 @@ namespace Birko.Data.SQL.Repositories
         /// <summary>
         /// Gets the SQLite connector.
         /// </summary>
-        public SqLiteConnector? Connector => Store?.GetUnwrappedStore<T, Data.Stores.AsyncSQLiteStore<T>>()?.Connector;
+        public SqLiteConnector? Connector => Store?.GetUnwrappedStore<T, AsyncSQLiteStore<T>>()?.Connector;
 
         /// <summary>
         /// The database file path.
@@ -28,26 +30,26 @@ namespace Birko.Data.SQL.Repositories
         public AsyncSqLiteModelRepository()
             : base(null)
         {
-            Store = new Data.Stores.AsyncSQLiteStore<T>();
+            Store = new AsyncSQLiteStore<T>();
         }
 
         public AsyncSqLiteModelRepository(Data.Stores.IAsyncStore<T>? store)
             : base(null)
         {
-            if (store != null && !store.IsStoreOfType<T, Data.Stores.AsyncSQLiteStore<T>>())
+            if (store != null && !store.IsStoreOfType<T, AsyncSQLiteStore<T>>())
             {
                 throw new ArgumentException(
                     "Store must be of type AsyncSQLiteStore<T> or a wrapper around it.",
                     nameof(store));
             }
-            Store = store ?? new Data.Stores.AsyncSQLiteStore<T>();
+            Store = store ?? new AsyncSQLiteStore<T>();
         }
 
         public void SetSettings(PasswordSettings settings)
         {
             if (settings != null)
             {
-                var innerStore = Store?.GetUnwrappedStore<T, Data.Stores.AsyncSQLiteStore<T>>();
+                var innerStore = Store?.GetUnwrappedStore<T, AsyncSQLiteStore<T>>();
                 innerStore?.SetSettings(settings);
             }
         }

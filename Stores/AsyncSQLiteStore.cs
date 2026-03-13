@@ -1,11 +1,13 @@
 using Birko.Data.SQL.Connectors;
+using Birko.Data.SQL.Stores;
+using Birko.Data.Stores;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Birko.Data.Stores
+namespace Birko.Data.SQL.SqLite.Stores
 {
     /// <summary>
     /// Native async SQLite store with bulk operation support.

@@ -1,4 +1,5 @@
 using Birko.Data.SQL.Connectors;
+using Birko.Data.SQL.Stores;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,7 @@ namespace Birko.Data.SQL.SqLite.Stores
     /// Combines single-item and bulk CRUD operations in one store.
     /// </summary>
     /// <typeparam name="T">The type of entity.</typeparam>
-    public class SQLiteStore<T> : Data.Stores.DataBaseBulkStore<SqLiteConnector, T>
+    public class SQLiteStore<T> : DataBaseBulkStore<SqLiteConnector, T>
         where T : Data.Models.AbstractModel
     {
         /// <summary>

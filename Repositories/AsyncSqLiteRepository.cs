@@ -1,5 +1,7 @@
 using Birko.Data.SQL.Connectors;
 using Birko.Data.Stores;
+using Birko.Data.SQL.SqLite.Stores;
+using Birko.Data.SQL.Stores;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,7 +24,7 @@ namespace Birko.Data.SQL.Repositories
         /// Gets the SQLite connector.
         /// This works with wrapped stores (e.g., tenant wrappers).
         /// </summary>
-        public SqLiteConnector? Connector => Store?.GetUnwrappedStore<TModel, Data.Stores.AsyncSQLiteStore<TModel>>()?.Connector;
+        public SqLiteConnector? Connector => Store?.GetUnwrappedStore<TModel, AsyncSQLiteStore<TModel>>()?.Connector;
 
         /// <summary>
         /// The database file path.
@@ -35,7 +37,7 @@ namespace Birko.Data.SQL.Repositories
         public AsyncSqLiteRepository()
             : base(null)
         {
-            Store = new Data.Stores.AsyncSQLiteStore<TModel>();
+            Store = new AsyncSQLiteStore<TModel>();
         }
 
         /// <summary>
@@ -45,13 +47,13 @@ namespace Birko.Data.SQL.Repositories
         public AsyncSqLiteRepository(Data.Stores.IAsyncStore<TModel>? store)
             : base(null)
         {
-            if (store != null && !store.IsStoreOfType<TModel, Data.Stores.AsyncSQLiteStore<TModel>>())
+            if (store != null && !store.IsStoreOfType<TModel, AsyncSQLiteStore<TModel>>())
             {
                 throw new ArgumentException(
                     "Store must be of type AsyncSQLiteStore<TModel> or a wrapper around it (e.g., AsyncTenantStoreWrapper).",
                     nameof(store));
             }
-            Store = store ?? new Data.Stores.AsyncSQLiteStore<TModel>();
+            Store = store ?? new AsyncSQLiteStore<TModel>();
         }
 
         /// <summary>
@@ -62,7 +64,7 @@ namespace Birko.Data.SQL.Repositories
         {
             if (settings != null)
             {
-                var innerStore = Store?.GetUnwrappedStore<TModel, Data.Stores.AsyncSQLiteStore<TModel>>();
+                var innerStore = Store?.GetUnwrappedStore<TModel, AsyncSQLiteStore<TModel>>();
                 innerStore?.SetSettings(settings);
             }
         }
