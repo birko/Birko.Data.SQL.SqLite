@@ -140,7 +140,8 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, email = excluded.email;
 ```
 
 ## Dependencies
-- Birko.Data
+- Birko.Data.Core
+- Birko.Data.Stores
 - Birko.Data.SQL
 - Microsoft.Data.Sqlite
 
