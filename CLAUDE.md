@@ -143,7 +143,16 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, email = excluded.email;
 - Birko.Data.Core
 - Birko.Data.Stores
 - Birko.Data.SQL
-- Microsoft.Data.Sqlite
+- Microsoft.Data.Sqlite (migrated from System.Data.SQLite)
+
+## Important Notes
+
+### Library Migration: System.Data.SQLite to Microsoft.Data.Sqlite
+The project migrated from the `System.Data.SQLite` package to `Microsoft.Data.Sqlite` (the official Microsoft ADO.NET provider). Key differences:
+- **Namespace:** `using Microsoft.Data.Sqlite;` (not `System.Data.SQLite`)
+- **Type names:** `SqliteConnection`, `SqliteCommand`, `SqliteParameter`, `SqliteException` (lowercase "ite")
+- **Connection string:** No longer requires `Version=3` suffix
+- **Exception messages:** Changed from `"SQL logic error"` / `"no such table:"` to `"SQLite Error"` / `"no such table"`
 
 ## Limitations
 - Single writer at a time (concurrent writes may fail)

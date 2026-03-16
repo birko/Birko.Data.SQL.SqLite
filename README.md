@@ -20,7 +20,14 @@ dotnet add package Birko.Data.SQL.SqLite
 - Birko.Data.Core (AbstractModel)
 - Birko.Data.Stores (store interfaces, Settings)
 - Birko.Data.SQL
-- Microsoft.Data.Sqlite
+- Microsoft.Data.Sqlite (migrated from System.Data.SQLite)
+
+## Migration from System.Data.SQLite
+
+This project now uses `Microsoft.Data.Sqlite` instead of `System.Data.SQLite`. If upgrading:
+- Replace `using System.Data.SQLite;` with `using Microsoft.Data.Sqlite;`
+- Rename types: `SQLiteConnection` -> `SqliteConnection`, `SQLiteCommand` -> `SqliteCommand`, `SQLiteParameter` -> `SqliteParameter`, `SQLiteException` -> `SqliteException`
+- Remove `Version=3` from connection strings
 
 ## Usage
 

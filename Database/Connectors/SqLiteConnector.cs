@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -23,7 +23,7 @@ namespace Birko.Data.SQL.Connectors
 
         private void SqLiteConnector_OnException(Exception ex, string? commandText)
         {
-            if (ex is SQLiteException && !IsInitializing && ex.Message.Contains("SQL logic error") && ex.Message.Contains("no such table:"))
+            if (ex is SqliteException && !IsInitializing && ex.Message.Contains("SQLite Error") && ex.Message.Contains("no such table"))
             {
                 DoInit();
             }
@@ -49,10 +49,10 @@ namespace Birko.Data.SQL.Connectors
             {
 
                 bool init = !System.IO.File.Exists(Path);
-                var connection = new SQLiteConnection(string.Format("Data Source={0}{1};Version=3", new[] {
-                    Path,
-                    !string.IsNullOrEmpty(settings.Password) ? string.Format(";Password={0};", settings.Password): null
-                }));
+                var connectionString = $"Data Source={Path}";
+                if (!string.IsNullOrEmpty(settings.Password))
+                    connectionString += $";Password={settings.Password}";
+                var connection = new SqliteConnection(connectionString);
                 if (init)
                 {
                     DoInit();
@@ -149,11 +149,11 @@ namespace Birko.Data.SQL.Connectors
             }
             if (command.Parameters.Contains(name))
             {
-                ((SQLiteParameter)command.Parameters[name]).Value = value ?? DBNull.Value;
+                ((SqliteParameter)command.Parameters[name]).Value = value ?? DBNull.Value;
             }
             else
             {
-                ((SQLiteCommand)command).Parameters.AddWithValue(name, value ?? DBNull.Value);
+                ((SqliteCommand)command).Parameters.AddWithValue(name, value ?? DBNull.Value);
             }
             return command;
         }
@@ -189,7 +189,7 @@ namespace Birko.Data.SQL.Connectors
             if (!fields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
@@ -240,7 +240,7 @@ namespace Birko.Data.SQL.Connectors
             if (!fields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
@@ -302,7 +302,7 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
@@ -367,7 +367,7 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
@@ -433,7 +433,7 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             connection.Open();
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
@@ -483,7 +483,7 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            using var connection = (SQLiteConnection)CreateConnection(_settings);
+            using var connection = (SqliteConnection)CreateConnection(_settings);
             await connection.OpenAsync(ct).ConfigureAwait(false);
             using var transaction = connection.BeginTransaction();
             string? commandText = null;
