@@ -25,7 +25,7 @@ namespace Birko.Data.SQL.SqLite.Stores
         /// Sets the connection settings.
         /// </summary>
         /// <param name="settings">The password settings to use.</param>
-        public override void SetSettings(Data.Stores.PasswordSettings settings)
+        public override void SetSettings(Birko.Configuration.PasswordSettings settings)
         {
             if (settings != null)
             {

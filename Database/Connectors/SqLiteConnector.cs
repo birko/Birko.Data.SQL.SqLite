@@ -10,13 +10,13 @@ using System.Threading.Tasks;
 using Birko.Data.SQL.Conditions;
 using Birko.Data.SQL.Connectors;
 using Birko.Data.SQL.Fields;
-using PasswordSettings = Birko.Data.Stores.PasswordSettings;
+using PasswordSettings = Birko.Configuration.PasswordSettings;
 
 namespace Birko.Data.SQL.Connectors
 {
     public class SqLiteConnector : AbstractConnector
     {
-        public SqLiteConnector(Data.Stores.PasswordSettings settings) : base(settings)
+        public SqLiteConnector(Birko.Configuration.PasswordSettings settings) : base(settings)
         {
             OnException += SqLiteConnector_OnException;
         }

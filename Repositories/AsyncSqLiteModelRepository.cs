@@ -1,11 +1,12 @@
 using Birko.Data.SQL.Connectors;
 using Birko.Data.Stores;
+using Birko.Configuration;
 using Birko.Data.SQL.SqLite.Stores;
 using Birko.Data.SQL.Stores;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using PasswordSettings = Birko.Data.Stores.PasswordSettings;
+using PasswordSettings = Birko.Configuration.PasswordSettings;
 
 namespace Birko.Data.SQL.Repositories
 {

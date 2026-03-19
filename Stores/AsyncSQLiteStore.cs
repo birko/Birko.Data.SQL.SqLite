@@ -1,6 +1,7 @@
 using Birko.Data.SQL.Connectors;
 using Birko.Data.SQL.Stores;
 using Birko.Data.Stores;
+using Birko.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
