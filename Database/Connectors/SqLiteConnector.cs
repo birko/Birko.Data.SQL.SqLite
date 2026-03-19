@@ -14,7 +14,7 @@ using PasswordSettings = Birko.Configuration.PasswordSettings;
 
 namespace Birko.Data.SQL.Connectors
 {
-    public class SqLiteConnector : AbstractConnector
+    public partial class SqLiteConnector : AbstractConnector
     {
         public SqLiteConnector(Birko.Configuration.PasswordSettings settings) : base(settings)
         {
