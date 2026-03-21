@@ -21,6 +21,24 @@ namespace Birko.Data.SQL.Connectors
             OnException += SqLiteConnector_OnException;
         }
 
+        /// <summary>
+        /// Detects SQLite transient errors: database locked (5), database busy (6).
+        /// </summary>
+        public override bool IsTransientException(Exception ex)
+        {
+            if (base.IsTransientException(ex)) return true;
+            if (ex is SqliteException sqliteEx)
+            {
+                switch (sqliteEx.SqliteErrorCode)
+                {
+                    case 5:   // SQLITE_BUSY — database is locked
+                    case 6:   // SQLITE_LOCKED — table in the database is locked
+                        return true;
+                }
+            }
+            return false;
+        }
+
         private void SqLiteConnector_OnException(Exception ex, string? commandText)
         {
             if (ex is SqliteException && !IsInitializing && ex.Message.Contains("SQLite Error") && ex.Message.Contains("no such table"))
