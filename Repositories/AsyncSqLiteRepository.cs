@@ -16,7 +16,7 @@ namespace Birko.Data.SQL.Repositories
     /// </summary>
     /// <typeparam name="TViewModel">The type of view model.</typeparam>
     /// <typeparam name="TModel">The type of data model.</typeparam>
-    public class AsyncSqLiteRepository<TViewModel, TModel>
+    public abstract class AsyncSqLiteRepository<TViewModel, TModel>
         : Data.Repositories.AbstractAsyncBulkViewModelRepository<TViewModel, TModel>
         where TModel : Models.AbstractModel, Models.ILoadable<TViewModel>
         where TViewModel : Models.ILoadable<TModel>
