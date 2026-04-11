@@ -38,7 +38,9 @@ namespace Birko.Data.SQL.SqLite.Stores
         }
 
         /// <summary>
-        /// Creates the database schema.
+        /// Ensures the table for T exists. Called automatically before the first CRUD operation
+        /// via the base EnsureInitializedAsync → InitCoreAsync chain.
+        /// Can also be called explicitly.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         public async Task CreateSchemaAsync(CancellationToken ct = default)
