@@ -17,6 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Stores\AsyncSQLiteStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Stores\SQLiteStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IndexManagement\SqLiteIndexManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Stores\SqLiteSettings.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Database\Connectors\" />

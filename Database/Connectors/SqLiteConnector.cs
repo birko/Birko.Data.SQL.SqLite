@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Birko.Data.SQL.Conditions;
 using Birko.Data.SQL.Connectors;
 using Birko.Data.SQL.Fields;
+using SqLiteSettings = Birko.Data.SQL.SqLite.Stores.SqLiteSettings;
 using PasswordSettings = Birko.Configuration.PasswordSettings;
 
 namespace Birko.Data.SQL.Connectors
@@ -63,24 +64,32 @@ namespace Birko.Data.SQL.Connectors
 
         public override DbConnection CreateConnection(PasswordSettings settings)
         {
-            if (settings != null && !string.IsNullOrEmpty(Path))
+            if (settings == null || string.IsNullOrEmpty(Path))
             {
+                throw new Exception("No path provided");
+            }
 
-                bool init = !System.IO.File.Exists(Path);
-                var connectionString = $"Data Source={Path}";
-                if (!string.IsNullOrEmpty(settings.Password))
-                    connectionString += $";Password={settings.Password}";
-                var connection = new SqliteConnection(connectionString);
+            bool init = !System.IO.File.Exists(Path);
+
+            if (settings is SqLiteSettings sqliteSettings)
+            {
+                var connection = new SqliteConnection(sqliteSettings.GetConnectionString());
                 if (init)
                 {
                     DoInit();
                 }
                 return connection;
             }
-            else
+
+            var connectionString = $"Data Source={Path}";
+            if (!string.IsNullOrEmpty(settings.Password))
+                connectionString += $";Password={settings.Password}";
+            var fallbackConnection = new SqliteConnection(connectionString);
+            if (init)
             {
-                throw new Exception("No path provided");
+                DoInit();
             }
+            return fallbackConnection;
         }
 
         public override string ConvertType(DbType type, AbstractField field)
