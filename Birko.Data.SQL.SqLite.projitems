@@ -18,6 +18,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Stores\SQLiteStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IndexManagement\SqLiteIndexManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Stores\SqLiteSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Stores\SqLiteStoreFactoryOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Stores\ISqLiteStoreFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Stores\SqLiteStoreFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Extensions\SqLiteServiceCollectionExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Database\Connectors\" />
