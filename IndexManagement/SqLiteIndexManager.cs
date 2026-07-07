@@ -26,15 +26,18 @@ namespace Birko.Data.SQL.SQLite.IndexManagement
 
         protected override string ListIndexesSql(string tableName)
         {
-            // Not used — ListAsync is overridden to use PRAGMA.
+            // Not used — ListAsync is overridden to use PRAGMA. Kept only to satisfy the abstract
+            // base contract; the base ListAsync no longer runs for SQLite (CR-H093).
             var safeTable = tableName.Replace("'", "''");
             return $"SELECT name, '', 0, CASE WHEN sql LIKE '%UNIQUE%' THEN 1 ELSE 0 END, 0 FROM sqlite_master WHERE type = 'index' AND tbl_name = '{safeTable}' AND name NOT LIKE 'sqlite_autoindex_%'";
         }
 
         /// <summary>
-        /// SQLite requires PRAGMA index_info per index to get column details.
+        /// SQLite requires PRAGMA index_info per index to get column details. Must be an override
+        /// (not `new`) so the inherited GetInfoAsync and IIndexManager/SqlIndexManager-typed callers
+        /// dispatch to this PRAGMA implementation instead of the empty-column base query (CR-H093).
         /// </summary>
-        public new async Task<IReadOnlyList<IndexInfo>> ListAsync(string? scope = null, CancellationToken ct = default)
+        public override async Task<IReadOnlyList<IndexInfo>> ListAsync(string? scope = null, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(scope))
                 throw new ArgumentException("Table name (scope) is required for SQL index management.", nameof(scope));
