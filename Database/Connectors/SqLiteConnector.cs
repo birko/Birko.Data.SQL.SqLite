@@ -216,42 +216,48 @@ namespace Birko.Data.SQL.Connectors
             if (!fields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            connection.Open();
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: wrap in ExecuteWithRetry so SQLITE_BUSY/SQLITE_LOCKED (flagged transient by the
+            // overridden IsTransientException) are retried per the configured RetryPolicy, matching the
+            // base RunCommandTransaction. Each attempt opens a fresh connection/transaction.
+            ExecuteWithRetry(() =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var columnNames = string.Join(", ", fields.Select(f => f.Name));
-                var paramNames = string.Join(", ", fields.Select(f => "@INS_" + f.Name.Replace(".", "")));
-                command.CommandText = "INSERT INTO " + QuoteIdentifier(table.Name)
-                    + " (" + columnNames + ") VALUES (" + paramNames + ")";
-                commandText = command.CommandText;
-
-                foreach (var field in fields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@INS_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
+                    var columnNames = string.Join(", ", fields.Select(f => f.Name));
+                    var paramNames = string.Join(", ", fields.Select(f => "@INS_" + f.Name.Replace(".", "")));
+                    command.CommandText = "INSERT INTO " + QuoteIdentifier(table.Name)
+                        + " (" + columnNames + ") VALUES (" + paramNames + ")";
+                    commandText = command.CommandText;
+
                     foreach (var field in fields)
                     {
-                        command.Parameters["@INS_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@INS_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    command.ExecuteNonQuery();
-                }
 
-                transaction.Commit();
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkInsert into " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        foreach (var field in fields)
+                        {
+                            command.Parameters["@INS_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        }
+                        command.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkInsert into " + table.Name);
+                }
+            }, "BulkInsert into " + table.Name);
         }
 
         public async Task BulkInsertAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -267,48 +273,53 @@ namespace Birko.Data.SQL.Connectors
             if (!fields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            await connection.OpenAsync(ct).ConfigureAwait(false);
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync (cancellation still
+            // propagates — OperationCanceledException is not transient).
+            await ExecuteWithRetryAsync(async () =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var columnNames = string.Join(", ", fields.Select(f => f.Name));
-                var paramNames = string.Join(", ", fields.Select(f => "@INS_" + f.Name.Replace(".", "")));
-                command.CommandText = "INSERT INTO " + QuoteIdentifier(table.Name)
-                    + " (" + columnNames + ") VALUES (" + paramNames + ")";
-                commandText = command.CommandText;
-
-                foreach (var field in fields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                await connection.OpenAsync(ct).ConfigureAwait(false);
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@INS_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
-                    ct.ThrowIfCancellationRequested();
+                    var columnNames = string.Join(", ", fields.Select(f => f.Name));
+                    var paramNames = string.Join(", ", fields.Select(f => "@INS_" + f.Name.Replace(".", "")));
+                    command.CommandText = "INSERT INTO " + QuoteIdentifier(table.Name)
+                        + " (" + columnNames + ") VALUES (" + paramNames + ")";
+                    commandText = command.CommandText;
+
                     foreach (var field in fields)
                     {
-                        command.Parameters["@INS_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@INS_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                }
 
-                transaction.Commit();
-            }
-            catch (OperationCanceledException)
-            {
-                transaction.Rollback();
-                throw;
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkInsertAsync into " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        foreach (var field in fields)
+                        {
+                            command.Parameters["@INS_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        }
+                        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    }
+
+                    transaction.Commit();
+                }
+                catch (OperationCanceledException)
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkInsertAsync into " + table.Name);
+                }
+            }, ct, "BulkInsertAsync into " + table.Name);
         }
 
         public void BulkUpdate(Type type, IEnumerable<object> models)
@@ -329,51 +340,55 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            connection.Open();
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetry.
+            ExecuteWithRetry(() =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var setClauses = updateFields.Select(f => f.Name + " = @SET_" + f.Name.Replace(".", ""));
-                var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
-                command.CommandText = "UPDATE " + QuoteIdentifier(table.Name)
-                    + " SET " + string.Join(", ", setClauses)
-                    + " WHERE " + string.Join(" AND ", whereClauses);
-                commandText = command.CommandText;
-
-                foreach (var field in updateFields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@SET_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
-                foreach (var field in primaryFields)
-                {
-                    command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
+                    var setClauses = updateFields.Select(f => f.Name + " = @SET_" + f.Name.Replace(".", ""));
+                    var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
+                    command.CommandText = "UPDATE " + QuoteIdentifier(table.Name)
+                        + " SET " + string.Join(", ", setClauses)
+                        + " WHERE " + string.Join(" AND ", whereClauses);
+                    commandText = command.CommandText;
+
                     foreach (var field in updateFields)
                     {
-                        command.Parameters["@SET_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@SET_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
                     foreach (var field in primaryFields)
                     {
-                        command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    command.ExecuteNonQuery();
-                }
 
-                transaction.Commit();
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkUpdate " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        foreach (var field in updateFields)
+                        {
+                            command.Parameters["@SET_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        }
+                        foreach (var field in primaryFields)
+                        {
+                            command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        }
+                        command.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkUpdate " + table.Name);
+                }
+            }, "BulkUpdate " + table.Name);
         }
 
         public async Task BulkUpdateAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -394,57 +409,61 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            await connection.OpenAsync(ct).ConfigureAwait(false);
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync.
+            await ExecuteWithRetryAsync(async () =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var setClauses = updateFields.Select(f => f.Name + " = @SET_" + f.Name.Replace(".", ""));
-                var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
-                command.CommandText = "UPDATE " + QuoteIdentifier(table.Name)
-                    + " SET " + string.Join(", ", setClauses)
-                    + " WHERE " + string.Join(" AND ", whereClauses);
-                commandText = command.CommandText;
-
-                foreach (var field in updateFields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                await connection.OpenAsync(ct).ConfigureAwait(false);
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@SET_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
-                foreach (var field in primaryFields)
-                {
-                    command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
-                    ct.ThrowIfCancellationRequested();
+                    var setClauses = updateFields.Select(f => f.Name + " = @SET_" + f.Name.Replace(".", ""));
+                    var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
+                    command.CommandText = "UPDATE " + QuoteIdentifier(table.Name)
+                        + " SET " + string.Join(", ", setClauses)
+                        + " WHERE " + string.Join(" AND ", whereClauses);
+                    commandText = command.CommandText;
+
                     foreach (var field in updateFields)
                     {
-                        command.Parameters["@SET_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@SET_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
                     foreach (var field in primaryFields)
                     {
-                        command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                }
 
-                transaction.Commit();
-            }
-            catch (OperationCanceledException)
-            {
-                transaction.Rollback();
-                throw;
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkUpdateAsync " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        foreach (var field in updateFields)
+                        {
+                            command.Parameters["@SET_" + field.Name.Replace(".", "")].Value = ConvertFieldValue(field, model) ?? DBNull.Value;
+                        }
+                        foreach (var field in primaryFields)
+                        {
+                            command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        }
+                        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    }
+
+                    transaction.Commit();
+                }
+                catch (OperationCanceledException)
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkUpdateAsync " + table.Name);
+                }
+            }, ct, "BulkUpdateAsync " + table.Name);
         }
 
         public void BulkDelete(Type type, IEnumerable<object> models)
@@ -460,41 +479,45 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            connection.Open();
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetry.
+            ExecuteWithRetry(() =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
-                command.CommandText = "DELETE FROM " + QuoteIdentifier(table.Name)
-                    + " WHERE " + string.Join(" AND ", whereClauses);
-                commandText = command.CommandText;
-
-                foreach (var field in primaryFields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
+                    var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
+                    command.CommandText = "DELETE FROM " + QuoteIdentifier(table.Name)
+                        + " WHERE " + string.Join(" AND ", whereClauses);
+                    commandText = command.CommandText;
+
                     foreach (var field in primaryFields)
                     {
-                        command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    command.ExecuteNonQuery();
-                }
 
-                transaction.Commit();
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkDelete " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        foreach (var field in primaryFields)
+                        {
+                            command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        }
+                        command.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkDelete " + table.Name);
+                }
+            }, "BulkDelete " + table.Name);
         }
 
         public async Task BulkDeleteAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -510,47 +533,51 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            using var connection = (SqliteConnection)CreateConnection(_settings);
-            await connection.OpenAsync(ct).ConfigureAwait(false);
-            using var transaction = connection.BeginTransaction();
-            string? commandText = null;
-            try
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync.
+            await ExecuteWithRetryAsync(async () =>
             {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-
-                var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
-                command.CommandText = "DELETE FROM " + QuoteIdentifier(table.Name)
-                    + " WHERE " + string.Join(" AND ", whereClauses);
-                commandText = command.CommandText;
-
-                foreach (var field in primaryFields)
+                using var connection = (SqliteConnection)CreateConnection(_settings);
+                await connection.OpenAsync(ct).ConfigureAwait(false);
+                using var transaction = connection.BeginTransaction();
+                string? commandText = null;
+                try
                 {
-                    command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
-                }
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
 
-                foreach (var model in models)
-                {
-                    ct.ThrowIfCancellationRequested();
+                    var whereClauses = primaryFields.Select(f => f.Name + " = @PK_" + f.Name.Replace(".", ""));
+                    command.CommandText = "DELETE FROM " + QuoteIdentifier(table.Name)
+                        + " WHERE " + string.Join(" AND ", whereClauses);
+                    commandText = command.CommandText;
+
                     foreach (var field in primaryFields)
                     {
-                        command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        command.Parameters.AddWithValue("@PK_" + field.Name.Replace(".", ""), DBNull.Value);
                     }
-                    await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                }
 
-                transaction.Commit();
-            }
-            catch (OperationCanceledException)
-            {
-                transaction.Rollback();
-                throw;
-            }
-            catch (Exception ex)
-            {
-                transaction.Rollback();
-                InitException(ex, commandText ?? "BulkDeleteAsync " + table.Name);
-            }
+                    foreach (var model in models)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        foreach (var field in primaryFields)
+                        {
+                            command.Parameters["@PK_" + field.Name.Replace(".", "")].Value = ConvertPrimaryKeyValue(field, model) ?? DBNull.Value;
+                        }
+                        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    }
+
+                    transaction.Commit();
+                }
+                catch (OperationCanceledException)
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    InitException(ex, commandText ?? "BulkDeleteAsync " + table.Name);
+                }
+            }, ct, "BulkDeleteAsync " + table.Name);
         }
 
         #endregion
