@@ -42,7 +42,12 @@ namespace Birko.Data.SQL.Connectors
 
         private void SqLiteConnector_OnException(Exception ex, string? commandText)
         {
-            if (ex is SqliteException && !IsInitializing && ex.Message.Contains("SQLite Error") && ex.Message.Contains("no such table"))
+            // Detect the missing-table case via the typed SqliteException + SqliteErrorCode (SQLITE_ERROR = 1)
+            // and a case-insensitive message match, rather than the brittle locale/version-dependent
+            // "SQLite Error" prefix substring (CR-L192).
+            if (!IsInitializing && ex is SqliteException sqliteEx
+                && sqliteEx.SqliteErrorCode == 1
+                && sqliteEx.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase))
             {
                 DoInit();
             }
