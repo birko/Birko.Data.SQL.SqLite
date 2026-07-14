@@ -145,6 +145,21 @@ namespace Birko.Data.SQL.Connectors
             var result = new StringBuilder();
             if (field != null)
             {
+                // TASK-058: SQLite accepts AUTOINCREMENT only as part of an `INTEGER PRIMARY KEY
+                // AUTOINCREMENT` column constraint — the keyword is inseparable from an INTEGER primary
+                // key, must sit adjacent to PRIMARY KEY, and the declared type must be exactly INTEGER.
+                // The previous code appended a bare `AUTOINCREMENT` after any UNIQUE/NOT NULL for ANY
+                // autoincrement field, producing invalid DDL: detached from PRIMARY KEY even for a PK
+                // column, and — worse — emitted for a NON-primary-key increment field (e.g. a dual-key
+                // model with a [PrimaryField] Guid + a separate [IncrementField] Id), which SQLite
+                // rejects outright, so CreateTable threw.
+                if (field.IsPrimary && field.IsAutoincrement)
+                {
+                    result.Append(field.Name);
+                    result.Append(" INTEGER PRIMARY KEY AUTOINCREMENT");
+                    return result.ToString();
+                }
+
                 result.Append(field.Name);
                 result.AppendFormat(" {0}", ConvertType(field.Type, field));
                 if (field.IsPrimary)
@@ -160,10 +175,10 @@ namespace Birko.Data.SQL.Connectors
                     result.AppendFormat(" NOT NULL");
                 }
 
-                if (field.IsAutoincrement)
-                {
-                    result.AppendFormat(" AUTOINCREMENT");
-                }
+                // A non-primary-key [IncrementField] cannot be AUTOINCREMENT in SQLite (no per-column
+                // auto-increment outside INTEGER PRIMARY KEY), so it is emitted as a plain column and
+                // the caller assigns the value. Providers with real non-PK identity (MSSql IDENTITY,
+                // PostgreSQL SERIAL) differ here — documented on the connector.
             }
             return result.ToString();
         }
