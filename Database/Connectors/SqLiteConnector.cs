@@ -190,6 +190,9 @@ namespace Birko.Data.SQL.Connectors
 
         public override DbCommand AddParameter(DbCommand command, string name, object? value)
         {
+            // Enums persist as INTEGER (IntegerField) — bind the underlying integral value rather than
+            // relying on the provider's own handling of a boxed enum. See NormalizeParameterValue.
+            value = NormalizeParameterValue(value);
             if(value is Guid)
             {
                 value = value?.ToString();
