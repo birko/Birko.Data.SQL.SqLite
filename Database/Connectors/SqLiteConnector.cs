@@ -127,10 +127,16 @@ namespace Birko.Data.SQL.Connectors
                 case DbType.UInt16:
                 case DbType.UInt32:
                 case DbType.UInt64:
-                case DbType.Single:
                 case DbType.SByte:
                 case DbType.Byte:
                     return "INTEGER";
+                case DbType.Single:
+                    // A C# float grouped with the integral types declared an INTEGER column. SQLite's
+                    // type affinity masks it for values it cannot losslessly narrow, but the declaration
+                    // is still wrong and rounds whole-valued floats to integers. REAL is SQLite's 8-byte
+                    // IEEE storage class — the same fix PostgreSQL and MSSql already carry (CR-H087).
+                    // Inert until SH-H037 gave `float` a field class; nothing could produce Single before.
+                    return "REAL";
                 case DbType.Xml:
                 case DbType.Object:
                 case DbType.Binary:
