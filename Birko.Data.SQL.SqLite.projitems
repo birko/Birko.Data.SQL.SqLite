@@ -9,6 +9,9 @@
     <Import_RootNamespace>Birko.Data.DataBase.Connector.SqLite</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Database\Connectors\SqLiteConnector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\SqLiteRepository.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\AsyncSqLiteRepository.cs" />
