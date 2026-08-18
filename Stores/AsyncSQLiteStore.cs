@@ -113,6 +113,10 @@ namespace Birko.Data.SQL.SqLite.Stores
                 storeDelegate?.Invoke(item);
             }
 
+            // The store-level door has to publish the boundary too, or the connector fix is
+            // unreachable through it: these Core overrides bypass the base's per-item write, and the
+            // base is the only place that entered the scope. Costs nothing when no context is set.
+            using var _tx = EnterTransactionScope();
             await Connector.BulkInsertAsync(typeof(T), items.Cast<object>(), ct).ConfigureAwait(false);
         }
 
@@ -134,6 +138,7 @@ namespace Birko.Data.SQL.SqLite.Stores
                 }
             }
 
+            using var _tx = EnterTransactionScope();
             await Connector.BulkUpdateAsync(typeof(T), items.Cast<object>(), ct).ConfigureAwait(false);
         }
 
@@ -145,6 +150,7 @@ namespace Birko.Data.SQL.SqLite.Stores
             if (Connector == null || data == null || !data.Any())
                 return;
 
+            using var _tx = EnterTransactionScope();
             await Connector.BulkDeleteAsync(typeof(T), data.Cast<object>(), ct).ConfigureAwait(false);
         }
 

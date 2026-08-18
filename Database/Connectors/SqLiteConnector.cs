@@ -245,14 +245,20 @@ namespace Birko.Data.SQL.Connectors
             if (!fields.Any())
                 return;
 
-            // CR-M144: wrap in ExecuteWithRetry so SQLITE_BUSY/SQLITE_LOCKED (flagged transient by the
-            // overridden IsTransientException) are retried per the configured RetryPolicy, matching the
-            // base RunCommandTransaction. Each attempt opens a fresh connection/transaction.
-            ExecuteWithRetry(() =>
+            // CR-M144: the own-connection path stays wrapped in ExecuteWithRetry so SQLITE_BUSY/SQLITE_LOCKED
+            // (flagged transient by the overridden IsTransientException) are retried per the configured
+            // RetryPolicy, matching the base RunCommandTransaction. RunBulk keeps that retry when it owns the
+            // connection and skips it when participating in a caller's boundary.
+            //
+            // A bulk write must JOIN an open boundary on this database rather than open a second connection.
+            // The sync store publishes its transaction context into AmbientSqlTransaction exactly as the
+            // async one does (DataBaseStore.EnterTransactionScope), so before this the sync single-row writes
+            // honoured a boundary while sync create-many / update-many / delete-many escaped it — loudly on
+            // SQLite, since the second connection cannot take the write lock the boundary already holds.
+            RunBulk("BulkInsert into " + table.Name, (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                connection.Open();
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -279,14 +285,14 @@ namespace Birko.Data.SQL.Connectors
                         command.ExecuteNonQuery();
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkInsert into " + table.Name);
                 }
-            }, "BulkInsert into " + table.Name);
+            });
         }
 
         public async Task BulkInsertAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -303,12 +309,19 @@ namespace Birko.Data.SQL.Connectors
                 return;
 
             // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync (cancellation still
-            // propagates — OperationCanceledException is not transient).
-            await ExecuteWithRetryAsync(async () =>
+            // propagates — OperationCanceledException is not transient). RunBulkAsync keeps that retry on
+            // the own-connection path and skips it when participating in a caller's boundary.
+            //
+            // A bulk write must JOIN an open boundary on this database rather than open a second connection:
+            // every collection-shaped repository write routes here, so this was create-many / update-many /
+            // delete-many / delete-where / delete-all escaping every transaction boundary — loudly on SQLite
+            // (the second connection cannot take the write lock the boundary holds) and SILENTLY on
+            // PostgreSQL/MySQL (two connections are legal, so it committed and survived the owner's
+            // rollback). See RunBulkAsync's remarks.
+            await RunBulkAsync("BulkInsertAsync into " + table.Name, async (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                await connection.OpenAsync(ct).ConfigureAwait(false);
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -336,19 +349,19 @@ namespace Birko.Data.SQL.Connectors
                         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (OperationCanceledException)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkInsertAsync into " + table.Name);
                 }
-            }, ct, "BulkInsertAsync into " + table.Name);
+            }, ct);
         }
 
         public void BulkUpdate(Type type, IEnumerable<object> models)
@@ -369,12 +382,13 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetry.
-            ExecuteWithRetry(() =>
+            // CR-M144: the own-connection path keeps its ExecuteWithRetry for SQLITE_BUSY/SQLITE_LOCKED;
+            // RunBulk skips the retry when participating in a caller's boundary. See BulkInsert above for
+            // why a bulk write has to join an open boundary instead of opening a second connection.
+            RunBulk("BulkUpdate " + table.Name, (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                connection.Open();
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -410,14 +424,14 @@ namespace Birko.Data.SQL.Connectors
                         command.ExecuteNonQuery();
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkUpdate " + table.Name);
                 }
-            }, "BulkUpdate " + table.Name);
+            });
         }
 
         public async Task BulkUpdateAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -438,12 +452,13 @@ namespace Birko.Data.SQL.Connectors
             if (!updateFields.Any())
                 return;
 
-            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync.
-            await ExecuteWithRetryAsync(async () =>
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync — kept by RunBulkAsync on
+            // the own-connection path, and skipped when participating in a caller's boundary (see its
+            // remarks; a bulk write must join an open boundary rather than open a second connection).
+            await RunBulkAsync("BulkUpdateAsync " + table.Name, async (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                await connection.OpenAsync(ct).ConfigureAwait(false);
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -480,19 +495,19 @@ namespace Birko.Data.SQL.Connectors
                         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (OperationCanceledException)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkUpdateAsync " + table.Name);
                 }
-            }, ct, "BulkUpdateAsync " + table.Name);
+            }, ct);
         }
 
         public void BulkDelete(Type type, IEnumerable<object> models)
@@ -508,12 +523,13 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetry.
-            ExecuteWithRetry(() =>
+            // CR-M144: the own-connection path keeps its ExecuteWithRetry for SQLITE_BUSY/SQLITE_LOCKED;
+            // RunBulk skips the retry when participating in a caller's boundary. See BulkInsert above for
+            // why a bulk write has to join an open boundary instead of opening a second connection.
+            RunBulk("BulkDelete " + table.Name, (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                connection.Open();
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -539,14 +555,14 @@ namespace Birko.Data.SQL.Connectors
                         command.ExecuteNonQuery();
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkDelete " + table.Name);
                 }
-            }, "BulkDelete " + table.Name);
+            });
         }
 
         public async Task BulkDeleteAsync(Type type, IEnumerable<object> models, CancellationToken ct = default)
@@ -562,12 +578,13 @@ namespace Birko.Data.SQL.Connectors
             if (!primaryFields.Any())
                 return;
 
-            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync.
-            await ExecuteWithRetryAsync(async () =>
+            // CR-M144: retry SQLITE_BUSY/SQLITE_LOCKED via ExecuteWithRetryAsync — kept by RunBulkAsync on
+            // the own-connection path, and skipped when participating in a caller's boundary (see its
+            // remarks; a bulk write must join an open boundary rather than open a second connection).
+            await RunBulkAsync("BulkDeleteAsync " + table.Name, async (dbConnection, dbTransaction, owned) =>
             {
-                using var connection = (SqliteConnection)CreateConnection(_settings);
-                await connection.OpenAsync(ct).ConfigureAwait(false);
-                using var transaction = connection.BeginTransaction();
+                var connection = (SqliteConnection)dbConnection;
+                var transaction = (SqliteTransaction)dbTransaction;
                 string? commandText = null;
                 try
                 {
@@ -594,19 +611,19 @@ namespace Birko.Data.SQL.Connectors
                         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
 
-                    transaction.Commit();
+                    if (owned) transaction.Commit();
                 }
                 catch (OperationCanceledException)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    transaction.Rollback();
+                    if (owned) transaction.Rollback();
                     InitException(ex, commandText ?? "BulkDeleteAsync " + table.Name);
                 }
-            }, ct, "BulkDeleteAsync " + table.Name);
+            }, ct);
         }
 
         #endregion
