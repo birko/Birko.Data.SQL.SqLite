@@ -20,7 +20,7 @@ namespace Birko.Data.SQL.SQLite.IndexManagement
 
         protected override string IndexExistsSql(string tableName, string indexName)
         {
-            var safeIndex = indexName.Replace("'", "''");
+            var safeIndex = SqlLiteral.EscapeLiteral(indexName);
             return $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '{safeIndex}'";
         }
 
@@ -28,7 +28,7 @@ namespace Birko.Data.SQL.SQLite.IndexManagement
         {
             // Not used — ListAsync is overridden to use PRAGMA. Kept only to satisfy the abstract
             // base contract; the base ListAsync no longer runs for SQLite (CR-H093).
-            var safeTable = tableName.Replace("'", "''");
+            var safeTable = SqlLiteral.EscapeLiteral(tableName);
             return $"SELECT name, '', 0, CASE WHEN sql LIKE '%UNIQUE%' THEN 1 ELSE 0 END, 0 FROM sqlite_master WHERE type = 'index' AND tbl_name = '{safeTable}' AND name NOT LIKE 'sqlite_autoindex_%'";
         }
 
@@ -44,7 +44,7 @@ namespace Birko.Data.SQL.SQLite.IndexManagement
 
             // Step 1: Get index names
             var indexNames = new List<(string Name, bool IsUnique)>();
-            var safeTable = scope!.Replace("'", "''");
+            var safeTable = SqlLiteral.EscapeLiteral(scope!);
             var namesSql = $"SELECT name, CASE WHEN sql LIKE '%UNIQUE%' THEN 1 ELSE 0 END AS is_unique FROM sqlite_master WHERE type = 'index' AND tbl_name = '{safeTable}' AND name NOT LIKE 'sqlite_autoindex_%'";
 
             await ExecuteReaderAsync(namesSql, reader =>
@@ -59,7 +59,7 @@ namespace Birko.Data.SQL.SQLite.IndexManagement
             var result = new List<IndexInfo>();
             foreach (var (name, isUnique) in indexNames)
             {
-                var safeName = name.Replace("'", "''");
+                var safeName = SqlLiteral.EscapeLiteral(name);
                 var fields = new List<IndexField>();
 
                 await ExecuteReaderAsync($"PRAGMA index_info('{safeName}')", reader =>
