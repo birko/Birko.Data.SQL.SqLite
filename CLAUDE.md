@@ -111,6 +111,17 @@ CREATE TABLE customers (
 );
 ```
 
+
+**`[UtcField]` and the two meanings of a `DateTime` column (TASK-256 / TASK-263).** A plain Birko `DateTime`
+column is a **wall clock** — the value's components as supplied, `Kind` not persisted, reads back
+`Unspecified`. Marking the property `[UtcField]` makes it an **instant**: `DbType.DateTimeOffset`, and it reads
+back `Kind=Utc` on every provider. Both coexist per property on one entity.
+SQLite has no timezone-aware type, so this **falls back**. Its `ConvertType` groups
+`DbType.DateTimeOffset` with the integral types and declares `INTEGER`, while Microsoft.Data.Sqlite
+actually stores ISO-8601 **text** carrying the offset. That declared/stored mismatch is pre-existing and
+shared with plain `DbType.DateTime` (also `INTEGER`, also text), so it is recorded rather than fixed into a
+divergence from its neighbour — and pinned by a test asserting both the declaration and `typeof()`.
+
 ## SQLite Specific Features
 
 ### AUTOINCREMENT
