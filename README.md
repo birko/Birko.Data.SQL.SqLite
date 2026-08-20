@@ -56,6 +56,25 @@ Data Source=path/to/database.db;    -- File-based
 Data Source=:memory:;               -- In-memory
 ```
 
+## Timestamps — two kinds of `DateTime` column
+
+```csharp
+[UtcField]                                  // an INSTANT
+public DateTime ObservedAt { get; set; }     // reads back DateTimeKind.Utc
+
+public DateTime NoticeDate { get; set; }     // a WALL CLOCK
+                                             // reads back DateTimeKind.Unspecified
+```
+
+A plain `DateTime` column stores the value's components exactly as supplied; `DateTimeKind` is not persisted.
+A `[UtcField]` one stores an **instant** — normalised to UTC on write, read back as `Kind=Utc`. Neither
+preserves a caller's original offset; if you need the offset itself, store it in its own column.
+
+**On SQLite `[UtcField]` falls back** — there is no timezone-aware type. The column is *declared*
+`INTEGER` while the driver actually stores ISO-8601 text carrying the offset; that mismatch is
+pre-existing and shared with a plain `DateTime` column, and is left as-is deliberately. The instant is
+exact either way.
+
 ## API Reference
 
 ### Stores
