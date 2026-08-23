@@ -175,7 +175,8 @@ namespace Birko.Data.SQL.Connectors
                 {
                     result.AppendFormat(" PRIMARY KEY");
                 }
-                if (field.IsUnique)
+                // TASK-275 — see AbstractField.UsesInlineUniqueConstraint. Behaviour-preserving here.
+                if (field.UsesInlineUniqueConstraint)
                 {
                     result.AppendFormat(" UNIQUE");
                 }
