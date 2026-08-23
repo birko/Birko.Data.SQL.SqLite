@@ -40,22 +40,20 @@ namespace Birko.Data.SQL.Connectors
             return false;
         }
 
+        /// <remarks>
+        /// TASK-277 — this used to answer a missing table with <c>DoInit()</c> and a <b>return</b>, so a
+        /// write against a table that does not exist reported success and lost the row. The decision now
+        /// lives in <c>AbstractConnector.EnsureSchemaAndReport</c>, shared by all four providers, which
+        /// ensures the schema and then reports the failure.
+        /// <para>
+        /// The typed <c>SqliteException</c> + <c>SqliteErrorCode == 1</c> test that used to be inline is
+        /// dropped in favour of <c>IsMissingTableException</c> — SQLite's wording ("no such table") is what
+        /// the base classifier already matches, and one classifier means the reader and this handler cannot
+        /// disagree about what a missing table is (TASK-211's rule).
+        /// </para>
+        /// </remarks>
         private void SqLiteConnector_OnException(Exception ex, string? commandText)
-        {
-            // Detect the missing-table case via the typed SqliteException + SqliteErrorCode (SQLITE_ERROR = 1)
-            // and a case-insensitive message match, rather than the brittle locale/version-dependent
-            // "SQLite Error" prefix substring (CR-L192).
-            if (!IsInitializing && ex is SqliteException sqliteEx
-                && sqliteEx.SqliteErrorCode == 1
-                && sqliteEx.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase))
-            {
-                DoInit();
-            }
-            else
-            {
-                throw new Exception(commandText, ex);
-            }
-        }
+            => EnsureSchemaAndReport(ex, commandText);
 
         public string? Path
         {
